@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
@@ -11,6 +12,8 @@ import {
   HiOutlineUser,
 } from 'react-icons/hi2'
 import Input, { type FieldConfig } from '@/app/components/fields/input'
+import { useAppDispatch } from '@/lib/hooks'
+import { registrationHandler, resendVerificationHandler } from '@/lib/features/auth.features'
 
 const registrationSchema = yup.object({
   firstName: yup
@@ -81,6 +84,8 @@ const fields: FieldConfig<RegistrationFormValues>[] = [
 ]
 
 const RegistrationForm = () => {
+  const dispatch = useAppDispatch()
+
   const {
     register,
     handleSubmit,
@@ -90,9 +95,43 @@ const RegistrationForm = () => {
     mode: 'onTouched',
   })
 
-  const onSubmit = (values: RegistrationFormValues) => {
-    // API integration handled separately
-    console.log(values)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null)
+  const [isResending, setIsResending] = useState(false)
+  const [resendMessage, setResendMessage] = useState<string | null>(null)
+
+  const onSubmit = async (values: RegistrationFormValues) => {
+    setFeedback(null)
+    setPendingEmail(null)
+    setResendMessage(null)
+
+    try {
+      const result = await dispatch(registrationHandler(values)).unwrap()
+      setFeedback({ type: 'success', message: result.message ?? 'Registration successful.' })
+
+      if (result.emailSent === false) {
+        setPendingEmail(values.email)
+      }
+    } catch (error) {
+      const message = (error as { error?: string } | undefined)?.error ?? 'Something went wrong.'
+      setFeedback({ type: 'error', message })
+    }
+  }
+
+  const handleResend = async () => {
+    if (!pendingEmail) return
+
+    setIsResending(true)
+    setResendMessage(null)
+
+    try {
+      const result = await dispatch(resendVerificationHandler({ email: pendingEmail })).unwrap()
+      setResendMessage(result.message ?? 'Verification email sent.')
+    } catch (error) {
+      setResendMessage((error as { error?: string } | undefined)?.error ?? 'Failed to resend verification email.')
+    } finally {
+      setIsResending(false)
+    }
   }
 
   return (
@@ -115,6 +154,12 @@ const RegistrationForm = () => {
           ))}
         </div>
 
+        {feedback && (
+          <p className={`text-[14px] ${feedback.type === 'error' ? 'text-error' : 'text-foreground'}`}>
+            {feedback.message}
+          </p>
+        )}
+
         <button
           type="submit"
           disabled={isSubmitting}
@@ -123,6 +168,22 @@ const RegistrationForm = () => {
           Create account
         </button>
       </form>
+
+      {pendingEmail && (
+        <div className="space-y-2 rounded-xl border border-border bg-surface-muted p-4 text-center">
+          <p className="text-[13px] text-muted-foreground">
+            {resendMessage ?? "Didn't get the email?"}
+          </p>
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={isResending}
+            className="h-10 w-full rounded-xl border border-primary text-[14px] font-medium text-primary transition-all duration-150 hover:bg-primary-light disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isResending ? 'Sending...' : 'Resend verification email'}
+          </button>
+        </div>
+      )}
 
       <p className="text-center text-[14px] text-muted-foreground">
         Already have an account?{' '}

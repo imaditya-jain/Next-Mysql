@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import StoreProvider from "./providers/StoreProvider";
+import { ToastContainer} from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,9 +27,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <StoreProvider>
-      <body className="min-h-full flex flex-col">{children}</body>
-      </StoreProvider>
+      <Suspense fallback={<body className="min-h-full flex flex-col" />}>
+        <StoreProvider>
+          <body className="min-h-full flex flex-col">
+            <ToastContainer />
+            {children}
+          </body>
+        </StoreProvider>
+      </Suspense>
     </html>
   );
 }
